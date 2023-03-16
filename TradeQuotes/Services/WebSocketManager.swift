@@ -8,10 +8,10 @@
 import Foundation
 
 protocol WebSocketManagerDelegate: AnyObject {
-    func webSocketManagerDidConnect(_ webSocketManager: WebSocketManager)
-    func webSocketManagerDidDisconnect(_ webSocketManager: WebSocketManager)
-    func webSocketManager(_ webSocketManager: WebSocketManager, didReceiveMessage message: String)
-    func webSocketManager(_ webSocketManager: WebSocketManager, didFailWithError error: Error)
+    func socketDidConnect(_ webSocketManager: WebSocketManager)
+    func socketDidDisconnect(_ webSocketManager: WebSocketManager)
+    func socketDidReceiveMessage(_ webSocketManager: WebSocketManager, didReceiveMessage message: String)
+    func socketFailWithError(_ webSocketManager: WebSocketManager, failWithError error: Error)
 }
 
 class WebSocketManager: NSObject {
@@ -22,7 +22,7 @@ class WebSocketManager: NSObject {
     
     weak var delegate: WebSocketManagerDelegate?
     
-    let tickersToWatchChanges = ["RSTI", "GAZP", "MRKZ", "RUAL", "HYDR", "MRKS", "SBER", "FEES", "TGKA", "VTBR,ANH.US", "VICL.US", "BURG. US", "NBL.US", "YETI.US", "WSFS.US", "NIO.US", "DXC.US", "MIC.US", "HSBC.US", "EXPN.EU", "GSK.EU","SH P.EU", "MAN.EU", "DB1.EU", "MUV2.EU", "TATE.EU", "KGF.EU", "MGGT.EU", "SGGD.EU"]
+    
     
     func connect() {
         guard webSocketTask == nil else { return }
@@ -31,7 +31,6 @@ class WebSocketManager: NSObject {
         webSocketTask = urlSession?.webSocketTask(with: url)
         
         webSocketTask?.resume()
-        sendSignal()
     }
     
     func disconnect() {
@@ -40,15 +39,15 @@ class WebSocketManager: NSObject {
         urlSession = nil
     }
     
-    func sendSignal() {
-        guard let quotesJSONData = try? JSONSerialization.data(withJSONObject: tickersToWatchChanges),
+    func send(text: [String]) {
+        guard let quotesJSONData = try? JSONSerialization.data(withJSONObject: text),
               let quotesJSONString = String(data: quotesJSONData, encoding: .utf8) else { return }
         
         let string = "[\"realtimeQuotes\", \(quotesJSONString)]"
         let messageData = URLSessionWebSocketTask.Message.data(Data(string.utf8))
         webSocketTask?.send(messageData) { error in
             if let error = error {
-                self.delegate?.webSocketManager(self, didFailWithError: error)
+                self.delegate?.socketFailWithError(self, failWithError: error)
             }
         }
     }
@@ -56,32 +55,32 @@ class WebSocketManager: NSObject {
 
 extension WebSocketManager: URLSessionWebSocketDelegate {
     func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask, didOpenWithProtocol protocol: String?) {
-        delegate?.webSocketManagerDidConnect(self)
+        delegate?.socketDidConnect(self)
         subscribe(to: webSocketTask)
     }
     
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
         if let error = error {
-            delegate?.webSocketManager(self, didFailWithError: error)
+            delegate?.socketFailWithError(self, failWithError: error)
         }
     }
     
     private func subscribe(to webSocketTask: URLSessionWebSocketTask) {
-        webSocketTask.receive { [weak self] result in
+        webSocketTask.receive { result in
             switch result {
             case .failure(let error):
-                self?.delegate?.webSocketManager(self!, didFailWithError: error)
+                self.delegate?.socketFailWithError(self, failWithError: error)
             case .success(let message):
                 switch message {
                 case .string(let text):
-                    self?.delegate?.webSocketManager(self!, didReceiveMessage: text)
+                    self.delegate?.socketDidReceiveMessage(self, didReceiveMessage: text)
                 case .data(let data):
                     print("Received binary message: \(data)")
                 @unknown default:
                     fatalError()
                 }
             }
-            self?.subscribe(to: webSocketTask)
+            self.subscribe(to: webSocketTask)
         }
     }
 }

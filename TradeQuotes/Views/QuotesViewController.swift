@@ -1,5 +1,5 @@
 //
-//  ViewController.swift
+//  QuotesViewController.swift
 //  TradeQuotes
 //
 //  Created by Sergio Veliz on 03.03.2023.
@@ -10,15 +10,16 @@ import UIKit
 class QuotesViewController: UIViewController {
     
     // MARK: - Properties
-        
+    
     private var viewModel = QuotesViewModel()
-        private let tableView = UITableView()
+    private lazy var tableView = UITableView()
     
     override func viewDidLoad() {
         super.viewDidLoad()
         
         // Настройка таблицы
         tableView.dataSource = self
+        tableView.delegate = self
         tableView.register(QuoteCell.self, forCellReuseIdentifier: "QuoteCell")
         view.addSubview(tableView)
         
@@ -37,7 +38,7 @@ class QuotesViewController: UIViewController {
     }
 }
 
-// Реализация методов UITableViewDataSource
+// MARK: - UITableViewDataSource
 extension QuotesViewController: UITableViewDataSource {
     
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
@@ -54,11 +55,20 @@ extension QuotesViewController: UITableViewDataSource {
     }
 }
 
+// MARK: - UITableViewDelegate
+extension QuotesViewController: UITableViewDelegate {}
+
+// MARK: Update table view after fetch data
 extension QuotesViewController: QuotesViewModelDelegate {
+    
+    func refreshTableViewCell(at index: Int) {
+        self.tableView.beginUpdates()
+        self.tableView.reloadRows(at: [IndexPath(row: index, section: 0)], with: .none)
+        self.tableView.endUpdates()
+    }
+    
     func reloadData() {
-        DispatchQueue.main.async {
-            self.tableView.reloadData()
-        }
+        self.tableView.reloadData()
     }
 }
 
